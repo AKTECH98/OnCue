@@ -1,0 +1,28 @@
+{
+  "name": "oncue",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Realtime voice orchestration for live broadcast production",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "workspaces": [
+    "shared",
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,client -c cyan,magenta \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "npm run dev --workspace @oncue/server",
+    "dev:client": "npm run dev --workspace @oncue/client",
+    "build": "npm run build --workspace @oncue/client",
+    "start": "npm run start --workspace @oncue/server",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspace @oncue/server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "~5.9.2"
+  }
+}
