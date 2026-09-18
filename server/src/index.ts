@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 
 import { env } from './config/env.js';
+import { CueEngine } from './cues/engine.js';
 import { createRouter } from './http/routes.js';
 import { createOrchestrator } from './orchestration/orchestrator.js';
 import { BroadcastStore } from './state/store.js';
@@ -13,6 +14,7 @@ store.startClock();
 let tracingHealth: TracingHealth | null = null;
 
 const executeTool = createOrchestrator(store);
+const cues = new CueEngine(store, executeTool);
 
 const router = createRouter({ store, tracingHealth: () => tracingHealth, executeTool });
 const httpServer = createServer((req, res) => {
@@ -22,7 +24,7 @@ const httpServer = createServer((req, res) => {
   });
 });
 
-const realtime = createRealtimeServer({ httpServer, store, executeTool });
+const realtime = createRealtimeServer({ httpServer, store, executeTool, cues });
 
 httpServer.listen(env.PORT, env.HOST, async () => {
   tracingHealth = await tracer.health();

@@ -1,5 +1,7 @@
 import type { VoiceActivity } from '@oncue/shared';
 
+import type { PlannedStep } from './understanding/plan.js';
+
 /**
  * What OnCue decided to do with a turn of speech.
  *
@@ -9,8 +11,13 @@ import type { VoiceActivity } from '@oncue/shared';
 export interface VoiceTurn {
   /** What OnCue should say back. Keep it to a few words. */
   say: string | null;
-  /** Tools Higgs (or the simulated understander) wants called, in order. */
+  /** Tools to run right now, in order. */
   toolCalls: { tool: string; args: Record<string, unknown> }[];
+  /**
+   * A multi-part instruction becomes a plan instead: each step carries the
+   * moment it should fire, and the whole thing lands on the cue stack.
+   */
+  steps?: PlannedStep[];
   /** True when the operator asked everything to stop. */
   hold: boolean;
 }

@@ -147,6 +147,25 @@ function interpretDirect(
     return { toolCalls: [{ tool: 'get_show_status', args: {} }] };
   }
 
+  if (/\bmusic\b/.test(text)) {
+    if (/\b(out|off|kill|drop|fade|down|under)\b/.test(text)) {
+      return { toolCalls: [{ tool: 'set_music', args: { level: 0 } }] };
+    }
+    const level = numberIn(text);
+    if (level !== null) return { toolCalls: [{ tool: 'set_music', args: { level } }] };
+    if (/\b(up|in|back)\b/.test(text)) {
+      return { toolCalls: [{ tool: 'set_music', args: { level: 45 } }] };
+    }
+  }
+
+  if (/\b(lower third|name ?key|super|graphic)\b/.test(text)) {
+    if (/\b(out|off|clear|hide|lose|kill|drop)\b/.test(text)) {
+      return { toolCalls: [{ tool: 'hide_lower_third', args: {} }] };
+    }
+    const guest = resolveNamedGuest(text, context) ?? memory.lastGuestId;
+    if (guest) return { toolCalls: [{ tool: 'show_lower_third', args: { guest } }] };
+  }
+
   const wantsPrepare = PREPARE_VERB.test(text);
   const wantsTake = TAKE_VERB.test(text);
   const namedGuest = resolveNamedGuest(text, context);
@@ -203,6 +222,41 @@ export function rememberFrom(
     if (typeof call.args.camera === 'number') next.lastCameraId = call.args.camera;
   }
   return next;
+}
+
+/** Cue-stack wording: what the operator would write on a run sheet. */
+export function describeCall(call: ToolCall, context: VoiceContext): string {
+  const who = () => guestName(String(call.args.guest ?? ''), context);
+  const camera = () => `camera ${call.args.camera}`;
+
+  switch (call.tool) {
+    case 'prepare_guest':
+      return `Ready ${who()}`;
+    case 'take_guest':
+      return `Take ${who()}`;
+    case 'prepare_camera':
+      return `Ready ${camera()}`;
+    case 'take_camera':
+      return `Take ${camera()}`;
+    case 'set_music':
+      return Number(call.args.level) === 0 ? 'Fade music' : `Music to ${call.args.level}`;
+    case 'show_lower_third':
+      return `Show ${who()} lower third`;
+    case 'hide_lower_third':
+      return 'Clear lower third';
+    case 'skip_segment':
+      return call.args.segment ? `Skip ${String(call.args.segment)}` : 'Skip next segment';
+    case 'advance_run_of_show':
+      return 'Next segment';
+    case 'set_microphone':
+      return `Mic ${call.args.microphone} ${call.args.state}`;
+    default:
+      return call.tool.replace(/_/g, ' ');
+  }
+}
+
+export function describeCalls(calls: ToolCall[], context: VoiceContext): string {
+  return calls.map((call) => describeCall(call, context)).join(', ');
 }
 
 /** Conversational replies for utterances that are not operational requests. */

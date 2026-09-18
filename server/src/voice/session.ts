@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { ServerMessage, VoiceActivity } from '@oncue/shared';
 
 import { env } from '../config/env.js';
+import type { CueEngine } from '../cues/engine.js';
 import type { Orchestrator } from '../orchestration/orchestrator.js';
 import type { BroadcastStore } from '../state/store.js';
 
@@ -13,6 +14,7 @@ export interface VoiceSessionOptions {
   store: BroadcastStore;
   orchestrate: Orchestrator;
   send: (message: ServerMessage) => void;
+  cues?: CueEngine;
 }
 
 /**
@@ -91,6 +93,26 @@ export class VoiceSession {
       });
     }
 
+    if (turn.steps?.length && this.options.cues) {
+      await this.options.cues.enqueue(
+        turn.steps.map((step) => ({
+          description: step.description,
+          trigger: step.trigger,
+          target: null,
+          actions: step.calls.map((call) => ({
+            tool: call.tool,
+            args: call.args,
+            description: step.description,
+          })),
+        })),
+      );
+      if (turnId !== this.turnId) return;
+
+      const waiting = turn.steps.filter((step) => step.trigger.type !== 'immediate').length;
+      this.say(turn.say ?? (waiting > 0 ? `${spell(waiting)} cued.` : 'Copy.'));
+      return;
+    }
+
     let spokenResult: string | null = null;
     for (const call of turn.toolCalls) {
       const result = await this.options.orchestrate(call.tool, call.args, 'voice');
@@ -161,6 +183,13 @@ export class VoiceSession {
       draft.system.higgs = env.higgsEnabled ? 'connected' : 'simulated';
     });
   }
+}
+
+const SPELLED = ['zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six'];
+
+/** Small counts sound better spoken as words. */
+function spell(count: number): string {
+  return SPELLED[count] ?? String(count);
 }
 
 function createVoiceBackend(): VoiceBackend {

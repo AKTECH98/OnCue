@@ -11,6 +11,7 @@ import {
 import { WebSocketServer, type WebSocket } from 'ws';
 
 import { env } from '../config/env.js';
+import type { CueEngine } from '../cues/engine.js';
 import type { BroadcastStore } from '../state/store.js';
 import { tracer } from '../tracing/tracer.js';
 import { VoiceSession } from '../voice/session.js';
@@ -25,6 +26,7 @@ export interface RealtimeServerOptions {
   httpServer: HttpServer;
   store: BroadcastStore;
   executeTool: ToolExecutor;
+  cues: CueEngine;
 }
 
 export interface RealtimeServer {
@@ -37,6 +39,7 @@ export function createRealtimeServer({
   httpServer,
   store,
   executeTool,
+  cues,
 }: RealtimeServerOptions): RealtimeServer {
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
   const clients = new Set<WebSocket>();
@@ -70,6 +73,7 @@ export function createRealtimeServer({
       new VoiceSession({
         store,
         orchestrate: executeTool,
+        cues,
         send: (message) => send(socket, message),
       }),
     );

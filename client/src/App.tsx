@@ -4,6 +4,7 @@ import { ActivityBar } from '@/components/activity-bar';
 import { AudioPanel } from '@/components/audio-panel';
 import { CameraGrid } from '@/components/camera-grid';
 import { ConsoleHeader } from '@/components/console-header';
+import { CueStack } from '@/components/cue-stack';
 import { Diagnostics } from '@/components/diagnostics';
 import { GraphicsPanel } from '@/components/graphics-panel';
 import { GuestControls } from '@/components/guest-controls';
@@ -40,6 +41,7 @@ export default function App() {
           </div>
 
           <aside className="flex flex-col gap-3">
+            <CueStack />
             <RunOfShow />
             <AudioPanel />
             <GraphicsPanel />

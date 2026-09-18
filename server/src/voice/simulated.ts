@@ -1,5 +1,6 @@
 import type { VoiceBackend, VoiceContext, VoiceTurn } from './backend.js';
 import {
+  describeCalls,
   emptyMemory,
   interpret,
   rememberFrom,
@@ -7,6 +8,7 @@ import {
   type ConversationMemory,
 } from './understanding/intent.js';
 import { normalize } from './understanding/normalize.js';
+import { planUtterance } from './understanding/plan.js';
 
 const HOLD = /\b(hold|stop|wait|freeze)\b/;
 
@@ -33,20 +35,28 @@ export class SimulatedVoiceBackend implements VoiceBackend {
 
     if (HOLD.test(normalized)) return { say: 'Holding.', toolCalls: [], hold: true };
 
-    const understanding = interpret(text, context, this.memory);
+    const plan = planUtterance(text, {
+      context,
+      memory: this.memory,
+      interpretClause: interpret,
+      rememberFrom,
+      describe: (calls, _clause, ctx) => describeCalls(calls, ctx),
+    });
+    this.memory = plan.memory;
 
-    if (understanding) {
-      this.memory = rememberFrom(understanding.toolCalls, this.memory);
-      return {
-        // With tool calls, the reply comes from the result, so OnCue can only
-        // claim what actually happened.
-        say: understanding.say ?? null,
-        toolCalls: understanding.toolCalls,
-        hold: understanding.hold ?? false,
-      };
+    const deferred = plan.steps.some((step) => step.trigger.type !== 'immediate');
+
+    // A multi-part instruction becomes a visible plan; a single command just runs.
+    if (plan.steps.length > 1 || deferred) {
+      return { say: plan.say, toolCalls: [], steps: plan.steps, hold: false };
     }
 
-    const reply = smallTalk(text, context);
+    const only = plan.steps[0];
+    if (only) {
+      return { say: plan.say, toolCalls: only.calls, hold: false };
+    }
+
+    const reply = plan.say ?? smallTalk(text, context);
     return { say: reply ?? "I didn't catch that.", toolCalls: [], hold: false };
   }
 

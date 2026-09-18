@@ -129,7 +129,7 @@ before the next begins.
 - [x] **Phase 5** — Voice tool calling
 - [x] **Phase 6** — Contextual production language
 - [x] **Phase 7** — Corrections and hold behavior
-- [ ] **Phase 8** — Cue stack
+- [x] **Phase 8** — Cue stack
 - [ ] **Phase 9** — Compound orchestration
 - [ ] **Phase 10** — Run-of-show intelligence
 - [ ] **Phase 11** — Code-switching
