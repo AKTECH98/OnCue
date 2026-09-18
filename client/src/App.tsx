@@ -1,56 +1,77 @@
 import { useEffect } from 'react';
 
+import { ActivityBar } from '@/components/activity-bar';
+import { AudioPanel } from '@/components/audio-panel';
+import { CameraGrid } from '@/components/camera-grid';
+import { ConsoleHeader } from '@/components/console-header';
+import { GraphicsPanel } from '@/components/graphics-panel';
+import { GuestControls } from '@/components/guest-controls';
+import { ProgramMonitor, PreviewMonitor } from '@/components/monitors';
+import { RunOfShow } from '@/components/run-of-show';
 import { useConsoleStore } from '@/store/console-store';
-
-const CONNECTION_COPY: Record<string, string> = {
-  connecting: 'Connecting to the OnCue server…',
-  open: 'Connected',
-  closed: 'Server unreachable — retrying',
-  error: 'Connection error — retrying',
-};
 
 export default function App() {
   const connect = useConsoleStore((s) => s.connect);
-  const connection = useConsoleStore((s) => s.connection);
   const state = useConsoleStore((s) => s.state);
+  const connection = useConsoleStore((s) => s.connection);
 
   useEffect(() => {
     connect();
   }, [connect]);
 
-  return (
-    <main className="flex min-h-full items-center justify-center p-6">
-      <div className="panel w-full max-w-lg p-8">
-        <p className="label-caps">OnCue</p>
-        <h1 className="font-display mt-1 text-3xl tracking-wide text-white">
-          Broadcast control online
-        </h1>
-        <p className="mt-2 text-sm text-console-300">
-          Phase 0 foundation — client, server and shared domain types are wired together.
-        </p>
+  if (!state) return <BootScreen connection={connection} />;
 
-        <dl className="mt-6 space-y-2 font-mono text-xs">
-          <Row label="Server link" value={CONNECTION_COPY[connection] ?? connection} />
-          <Row label="Event" value={state?.show.eventTitle ?? '—'} />
-          <Row
-            label="Current segment"
-            value={
-              state?.show.runOfShow.find((s) => s.id === state.show.currentSegmentId)?.title ?? '—'
-            }
-          />
-          <Row label="Program" value={state ? `CAM ${state.video.programCamera}` : '—'} />
-          <Row label="State revision" value={state ? String(state.revision) : '—'} />
-        </dl>
+  return (
+    <div className="flex h-full flex-col bg-console-950">
+      <ConsoleHeader />
+
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="grid gap-3 p-3 xl:grid-cols-[minmax(0,1fr)_21rem]">
+          <div className="flex min-w-0 flex-col gap-3">
+            <div className="grid gap-3 lg:grid-cols-[1.55fr_1fr]">
+              <ProgramMonitor />
+              <PreviewMonitor />
+            </div>
+            <CameraGrid />
+            <GuestControls />
+          </div>
+
+          <aside className="flex flex-col gap-3">
+            <RunOfShow />
+            <AudioPanel />
+            <GraphicsPanel />
+          </aside>
+        </div>
       </div>
-    </main>
+
+      <ActivityBar />
+    </div>
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function BootScreen({ connection }: { connection: string }) {
+  const failed = connection === 'closed' || connection === 'error';
+
   return (
-    <div className="flex items-center justify-between border-b border-console-800 pb-2">
-      <dt className="text-console-400">{label}</dt>
-      <dd className="text-console-200">{value}</dd>
-    </div>
+    <main className="flex h-full items-center justify-center p-6">
+      <div className="panel w-full max-w-md p-8 text-center">
+        <span className="mx-auto mb-4 flex h-10 w-10 items-center justify-center">
+          <span className="absolute h-10 w-10 rounded-full border-[3px] border-program/40" />
+          <span className="h-2.5 w-2.5 rounded-full bg-program tally-live" />
+        </span>
+        <h1 className="font-display text-2xl tracking-[0.15em] text-white">ONCUE</h1>
+        <p className="mt-3 text-sm text-console-300">
+          {failed
+            ? 'Cannot reach the OnCue server.'
+            : 'Loading the production state from the OnCue server…'}
+        </p>
+        {failed ? (
+          <p className="mt-2 font-mono text-[11px] text-console-500">
+            Start it with <span className="text-console-300">npm run dev</span> and this console
+            will reconnect on its own.
+          </p>
+        ) : null}
+      </div>
+    </main>
   );
 }

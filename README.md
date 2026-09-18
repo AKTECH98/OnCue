@@ -122,7 +122,7 @@ OnCue is built in strict phases; each one has to satisfy its acceptance criteria
 before the next begins.
 
 - [x] **Phase 0** — Project foundation: workspaces, shared domain types, WebSocket link, tracing config
-- [ ] **Phase 1** — Broadcast simulator (fully operable by hand, no AI)
+- [x] **Phase 1** — Broadcast simulator (fully operable by hand, no AI)
 - [ ] **Phase 2** — Deterministic broadcast domain tools
 - [ ] **Phase 3** — LangGraph orchestration layer
 - [ ] **Phase 4** — Higgs Realtime foundation
@@ -136,3 +136,30 @@ before the next begins.
 - [ ] **Phase 12** — Observability and reliability pass
 - [ ] **Phase 13** — Deployment
 - [ ] **Phase 14** — Visual polish
+
+---
+
+## Operating the show by hand
+
+Everything in OnCue can be driven manually, with or without voice. This is the
+fallback path a real operator needs, and the rehearsal harness for the AI layers.
+
+| Control            | Where                        | Effect                                                    |
+| ------------------ | ---------------------------- | --------------------------------------------------------- |
+| Ready / Take camera| Camera grid                  | Sets preview or program                                     |
+| Ready / Take guest | Speakers panel               | Compound switch: camera, mic, lower third, segment          |
+| Mic live/ready/mute| Audio panel                  | Per-microphone state                                        |
+| Music bed          | Audio panel                  | 0–100 music level                                           |
+| Lower thirds       | Graphics panel               | Show a guest's lower third or clear it                      |
+| Next / Skip        | Run of Show                  | Advance or drop a segment; skipping buys back its budget    |
+| Reset              | Header                       | Restores the known rehearsal state                          |
+
+The same operations are reachable over HTTP for scripted testing:
+
+```bash
+curl -X POST http://127.0.0.1:43128/api/tools/prepare_guest \
+  -H 'content-type: application/json' -d '{"guest":"daniel"}'
+
+curl -X POST http://127.0.0.1:43128/api/tools/take_guest \
+  -H 'content-type: application/json' -d '{"guest":"daniel"}'
+```

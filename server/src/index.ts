@@ -1,10 +1,9 @@
 import { createServer } from 'node:http';
 
-import type { ToolInvocationResult, ToolSource } from '@oncue/shared';
-
 import { env } from './config/env.js';
 import { createRouter } from './http/routes.js';
 import { BroadcastStore } from './state/store.js';
+import { createToolExecutor } from './tools/execute.js';
 import { tracer, type TracingHealth } from './tracing/tracer.js';
 import { createRealtimeServer } from './websocket/realtime-server.js';
 
@@ -13,22 +12,7 @@ store.startClock();
 
 let tracingHealth: TracingHealth | null = null;
 
-/**
- * Phase 0 placeholder. Phase 2 registers the deterministic broadcast tools and
- * Phase 3 routes them through LangGraph; the signature stays identical.
- */
-const executeTool = async (
-  tool: string,
-  _args: Record<string, unknown>,
-  _source: ToolSource,
-): Promise<ToolInvocationResult> => ({
-  ok: false,
-  tool,
-  message: `Tool "${tool}" is not registered yet.`,
-  path: ['dispatch', 'unregistered'],
-  durationMs: 0,
-  errorCode: 'tool_not_registered',
-});
+const executeTool = createToolExecutor(store);
 
 const router = createRouter({ store, tracingHealth: () => tracingHealth, executeTool });
 const httpServer = createServer((req, res) => {
