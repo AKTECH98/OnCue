@@ -1,4 +1,4 @@
-import type { VoiceContext, VoiceTurn } from '../backend.js';
+import type { VoiceContext } from '../backend.js';
 
 import { normalize, numberIn } from './normalize.js';
 
@@ -7,27 +7,43 @@ export interface ToolCall {
   args: Record<string, unknown>;
 }
 
+export interface Understanding {
+  toolCalls: ToolCall[];
+  /** Spoken reply that replaces the tool result, e.g. for a no-op confirmation. */
+  say?: string;
+  hold?: boolean;
+}
+
 /**
- * Production shorthand, not natural language in general.
+ * What the conversation has established so far.
  *
- * "Ready" prepares, "take" commits — that distinction is the whole grammar.
- * Everything here is deterministic so the demo behaves the same every run;
- * the Higgs backend replaces this module wholesale, not the layers around it.
+ * This is what makes "take him" meaningful. It is conversational memory only —
+ * the production state remains the single source of truth for what is actually
+ * on air.
  */
+export interface ConversationMemory {
+  lastGuestId: string | null;
+  lastCameraId: number | null;
+}
+
+export const emptyMemory = (): ConversationMemory => ({ lastGuestId: null, lastCameraId: null });
 
 const PREPARE_VERB = /\b(ready|prep|prepare|stand ?by|preview|set ?up|queue)\b/;
-const TAKE_VERB = /\b(take|cut|punch|go to|switch to|on air|live)\b/;
+const TAKE_VERB = /\b(take|cut|punch|go to|switch to|bring up|on air)\b/;
+const PERSON_PRONOUN = /\b(him|her|them|he|she|they)\b/;
+const THING_PRONOUN = /\b(it|that|this|the same)\b/;
+const STAY = /\b(stay|hold on|remain|keep)\b (on|with) /;
 
-export function resolveGuest(text: string, context: VoiceContext): string | null {
+function escape(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export function resolveNamedGuest(text: string, context: VoiceContext): string | null {
   for (const guest of context.guests) {
     const names = [guest.id, guest.name.toLowerCase(), ...guest.aliases];
     if (names.some((name) => new RegExp(`\\b${escape(name)}\\b`).test(text))) return guest.id;
   }
   return null;
-}
-
-function escape(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function cameraNumber(text: string): number | null {
@@ -39,38 +55,103 @@ function cameraNumber(text: string): number | null {
   return numberIn(text);
 }
 
+function guestName(guestId: string | null, context: VoiceContext): string {
+  const guest = context.guests.find((g) => g.id === guestId);
+  return guest ? (guest.name.split(' ')[0] ?? guest.name) : 'that';
+}
+
 /**
- * Turns one operator utterance into the operations it implies.
- * Returns null when nothing actionable was said.
+ * Resolves who "him" or "her" refers to.
+ *
+ * Preference order matches how a control room actually talks: whoever was just
+ * named, then whoever is prepared, then whoever is on air.
  */
-export function parseIntent(rawText: string, context: VoiceContext): ToolCall[] | null {
+function resolvePerson(
+  context: VoiceContext,
+  memory: ConversationMemory,
+): string | null {
+  if (memory.lastGuestId) return memory.lastGuestId;
+
+  const prepared = context.guests.find((g) => g.name === context.preparedSpeaker);
+  if (prepared) return prepared.id;
+
+  const active = context.guests.find((g) => g.name === context.activeSpeaker);
+  return active?.id ?? null;
+}
+
+/** Resolves what "it" refers to: the camera just named, else what is in preview. */
+function resolveThing(context: VoiceContext, memory: ConversationMemory): number | null {
+  return memory.lastCameraId ?? context.previewCamera;
+}
+
+export function interpret(
+  rawText: string,
+  context: VoiceContext,
+  memory: ConversationMemory,
+): Understanding | null {
   const text = normalize(rawText);
   if (!text) return null;
 
-  const guestId = resolveGuest(text, context);
+  if (/\b(status|where are we|what.s (the )?status)\b/.test(text)) {
+    return { toolCalls: [{ tool: 'get_show_status', args: {} }] };
+  }
+
   const wantsPrepare = PREPARE_VERB.test(text);
   const wantsTake = TAKE_VERB.test(text);
+  const namedGuest = resolveNamedGuest(text, context);
 
-  if (/\b(status|where are we|what.s (the )?status)\b/.test(text)) {
-    return [{ tool: 'get_show_status', args: {} }];
-  }
-
-  if (guestId) {
-    // "Daniel next" and "Daniel's up" are prepares even without a verb.
-    if (wantsTake && !wantsPrepare) return [{ tool: 'take_guest', args: { guest: guestId } }];
-    if (wantsPrepare || /\b(next|up next|after|on deck|standing by)\b/.test(text)) {
-      return [{ tool: 'prepare_guest', args: { guest: guestId } }];
+  // "Stay on her" is an instruction to do nothing, and must be honoured as one.
+  if (STAY.test(text)) {
+    const target = namedGuest ?? (PERSON_PRONOUN.test(text) ? resolvePerson(context, memory) : null);
+    if (target || THING_PRONOUN.test(text)) {
+      const who = target ? guestName(target, context) : `camera ${context.programCamera}`;
+      return { toolCalls: [], say: `Staying on ${who}.` };
     }
-    return [{ tool: 'prepare_guest', args: { guest: guestId } }];
   }
 
+  if (namedGuest) {
+    if (wantsTake && !wantsPrepare) {
+      return { toolCalls: [{ tool: 'take_guest', args: { guest: namedGuest } }] };
+    }
+    return { toolCalls: [{ tool: 'prepare_guest', args: { guest: namedGuest } }] };
+  }
+
+  // Pronouns only resolve to a person when no camera number was spoken.
   const camera = cameraNumber(text);
+
+  if (camera === null && PERSON_PRONOUN.test(text)) {
+    const target = resolvePerson(context, memory);
+    if (!target) return { toolCalls: [], say: 'Who do you mean?' };
+    if (wantsTake) return { toolCalls: [{ tool: 'take_guest', args: { guest: target } }] };
+    if (wantsPrepare) return { toolCalls: [{ tool: 'prepare_guest', args: { guest: target } }] };
+  }
+
+  if (camera === null && THING_PRONOUN.test(text)) {
+    const target = resolveThing(context, memory);
+    if (target === null) return { toolCalls: [], say: 'Nothing is ready.' };
+    if (wantsTake) return { toolCalls: [{ tool: 'take_camera', args: { camera: target } }] };
+    if (wantsPrepare) return { toolCalls: [{ tool: 'prepare_camera', args: { camera: target } }] };
+  }
+
   if (camera !== null) {
-    if (wantsTake && !wantsPrepare) return [{ tool: 'take_camera', args: { camera } }];
-    if (wantsPrepare) return [{ tool: 'prepare_camera', args: { camera } }];
+    if (wantsTake && !wantsPrepare) return { toolCalls: [{ tool: 'take_camera', args: { camera } }] };
+    if (wantsPrepare) return { toolCalls: [{ tool: 'prepare_camera', args: { camera } }] };
   }
 
   return null;
+}
+
+/** Records what this turn established, so the next one can say "him" or "it". */
+export function rememberFrom(
+  calls: ToolCall[],
+  memory: ConversationMemory,
+): ConversationMemory {
+  const next = { ...memory };
+  for (const call of calls) {
+    if (typeof call.args.guest === 'string') next.lastGuestId = call.args.guest;
+    if (typeof call.args.camera === 'number') next.lastCameraId = call.args.camera;
+  }
+  return next;
 }
 
 /** Conversational replies for utterances that are not operational requests. */
@@ -85,8 +166,4 @@ export function smallTalk(rawText: string, context: VoiceContext): string | null
     return `${context.activeSpeaker ?? `Camera ${context.programCamera}`} on program.`;
   }
   return null;
-}
-
-export function emptyTurn(): VoiceTurn {
-  return { say: null, toolCalls: [], hold: false };
 }
