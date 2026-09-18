@@ -2,7 +2,6 @@ import type { MicrophoneState } from '@oncue/shared';
 import { Music2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-import { Button } from '@/components/ui/button';
 import { Panel } from '@/components/ui/panel';
 import { cn } from '@/lib/cn';
 import { useConsoleStore } from '@/store/console-store';
@@ -12,6 +11,16 @@ const MIC_STATES: { value: MicrophoneState; label: string }[] = [
   { value: 'ready', label: 'Ready' },
   { value: 'muted', label: 'Mute' },
 ];
+
+/**
+ * Only the selected state carries colour. A microphone has exactly one state,
+ * so three lit buttons would be a lie about the audio.
+ */
+const STATE_ACTIVE: Record<MicrophoneState, string> = {
+  live: 'bg-program text-white',
+  ready: 'bg-preview text-console-950',
+  muted: 'bg-console-500 text-white',
+};
 
 export function AudioPanel() {
   const microphones = useConsoleStore((s) => s.state?.audio.microphones ?? []);
@@ -34,19 +43,28 @@ export function AudioPanel() {
                   {guest?.name ?? 'Unassigned'}
                 </span>
               </div>
-              <div className="flex gap-1">
+              <div
+                role="group"
+                aria-label={`${mic.label} state`}
+                className="flex overflow-hidden rounded border border-console-600"
+              >
                 {MIC_STATES.map(({ value, label }) => (
-                  <Button
+                  <button
                     key={value}
-                    size="sm"
-                    variant={value === 'live' ? 'program' : value === 'ready' ? 'preview' : 'default'}
-                    active={mic.state === value}
+                    type="button"
+                    aria-pressed={mic.state === value}
                     onClick={() =>
                       void invoke('set_microphone', { microphone: mic.id, state: value })
                     }
+                    className={cn(
+                      'h-7 border-r border-console-600 px-2.5 text-[10px] font-semibold uppercase tracking-wider transition-colors last:border-r-0',
+                      mic.state === value
+                        ? STATE_ACTIVE[value]
+                        : 'bg-console-850 text-console-400 hover:bg-console-700 hover:text-console-200',
+                    )}
                   >
                     {label}
-                  </Button>
+                  </button>
                 ))}
               </div>
             </div>
