@@ -123,7 +123,7 @@ before the next begins.
 
 - [x] **Phase 0** — Project foundation: workspaces, shared domain types, WebSocket link, tracing config
 - [x] **Phase 1** — Broadcast simulator (fully operable by hand, no AI)
-- [ ] **Phase 2** — Deterministic broadcast domain tools
+- [x] **Phase 2** — Deterministic broadcast domain tools
 - [ ] **Phase 3** — LangGraph orchestration layer
 - [ ] **Phase 4** — Higgs Realtime foundation
 - [ ] **Phase 5** — Higgs tool calling

@@ -6,6 +6,7 @@ import { CameraGrid } from '@/components/camera-grid';
 import { ConsoleHeader } from '@/components/console-header';
 import { GraphicsPanel } from '@/components/graphics-panel';
 import { GuestControls } from '@/components/guest-controls';
+import { MediaPanel } from '@/components/media-panel';
 import { ProgramMonitor, PreviewMonitor } from '@/components/monitors';
 import { RunOfShow } from '@/components/run-of-show';
 import { useConsoleStore } from '@/store/console-store';
@@ -40,6 +41,7 @@ export default function App() {
             <RunOfShow />
             <AudioPanel />
             <GraphicsPanel />
+            <MediaPanel />
           </aside>
         </div>
       </div>

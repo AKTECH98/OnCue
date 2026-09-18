@@ -129,6 +129,59 @@ export function nextPlayableSegment(
   );
 }
 
+export function updateGuestMetadata(
+  state: BroadcastState,
+  guestId: string,
+  patch: { name?: string; title?: string; organization?: string },
+): Guest | undefined {
+  const guest = state.speakers.guests.find((g) => g.id === guestId);
+  if (!guest) return undefined;
+
+  if (patch.name) guest.name = patch.name;
+  if (patch.title) guest.title = patch.title;
+  if (patch.organization) guest.organization = patch.organization;
+
+  // Any graphic already carrying this person must reflect the correction.
+  for (const slot of [state.graphics.current, state.graphics.prepared]) {
+    if (slot?.guestId === guest.id) {
+      slot.name = guest.name;
+      slot.title = guest.title;
+      slot.organization = guest.organization;
+    }
+  }
+
+  return guest;
+}
+
+export function playMedia(state: BroadcastState, mediaId: string, nowMs: number): boolean {
+  const item = state.media.library.find((m) => m.id === mediaId);
+  if (!item) return false;
+  state.media.activeMediaId = item.id;
+  state.media.state = 'playing';
+  state.media.positionSec = 0;
+
+  const segment = state.show.runOfShow.find((s) => s.mediaId === item.id);
+  if (segment && segment.status !== 'skipped' && segment.status !== 'completed') {
+    activateSegment(state, segment.id, nowMs);
+  }
+  return true;
+}
+
+export function stopMedia(state: BroadcastState): void {
+  state.media.state = 'stopped';
+  state.media.positionSec = 0;
+  state.media.activeMediaId = null;
+}
+
+export function moveSlide(state: BroadcastState, delta: number): number {
+  const target = state.presentation.currentSlide + delta;
+  state.presentation.currentSlide = Math.min(
+    Math.max(1, target),
+    Math.max(1, state.presentation.totalSlides),
+  );
+  return state.presentation.currentSlide;
+}
+
 /** Everything that changes when a guest takes the program feed. */
 export function takeGuest(state: BroadcastState, guest: Guest, nowMs: number): string[] {
   const changes: string[] = [];
