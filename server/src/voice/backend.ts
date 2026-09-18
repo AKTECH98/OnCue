@@ -32,6 +32,7 @@ export interface VoiceContext {
   previewCamera: number | null;
   delaySec: number;
   guests: { id: string; name: string; aliases: string[]; cameraId: number }[];
+  segments: { id: string; title: string; status: string }[];
 }
 
 export interface VoiceBackend {

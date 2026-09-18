@@ -171,6 +171,11 @@ export class VoiceSession {
         aliases: g.aliases,
         cameraId: g.cameraId,
       })),
+      segments: state.show.runOfShow.map((s) => ({
+        id: s.id,
+        title: s.title,
+        status: s.status,
+      })),
     };
   }
 

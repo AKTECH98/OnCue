@@ -130,7 +130,7 @@ before the next begins.
 - [x] **Phase 6** — Contextual production language
 - [x] **Phase 7** — Corrections and hold behavior
 - [x] **Phase 8** — Cue stack
-- [ ] **Phase 9** — Compound orchestration
+- [x] **Phase 9** — Compound orchestration
 - [ ] **Phase 10** — Run-of-show intelligence
 - [ ] **Phase 11** — Code-switching
 - [ ] **Phase 12** — Observability and reliability pass
@@ -224,3 +224,29 @@ Interruption is treated as a first-class behaviour, not an edge case:
 - saying *"hold"* stops speech **and** freezes anything the audience would see,
   while still allowing preview work
 - a turn that was interrupted can never speak afterwards
+
+---
+
+## Talking to OnCue
+
+Press **Listen** and speak, or type into the command box — both take the same
+path. A few things it understands:
+
+| You say                                             | What happens                                                        |
+| --------------------------------------------------- | -------------------------------------------------------------------- |
+| "Ready three."                                       | Camera 3 to preview                                                   |
+| "Take three."                                        | Camera 3 to program                                                   |
+| "Daniel next." … "Take him."                         | Daniel prepared, then taken live                                      |
+| "Take two—actually three."                           | Camera 3 only; camera 2 never reaches program                         |
+| "Daniel's title is CTO—actually VP Product."         | Guest record and the on-screen graphic both corrected                 |
+| "Hold." / "Go ahead."                                | Freeze pending cues, then release                                     |
+| "Cancel that."                                       | Drop the prepared speaker, graphics and any pending cue               |
+| "Daniel next, music out after Sarah, then take three." | One cue fires now, two wait on the cue stack                        |
+| "Take Daniel."                                       | Camera, mic, previous mic, lower third, speaker and segment together  |
+| "Move to Q and A."                                   | Run of show, host camera, all microphones and graphics together       |
+| "Go to break."                                       | Bumper rolls, guest mics close, music up, next segment readied        |
+| "Take camera seven."                                 | "There are four cameras." — nothing changes                           |
+
+Compound orchestration is the point: one instruction changes four or more
+aspects of the production at once, which is what separates OnCue from a voice
+remote that maps one command to one action.

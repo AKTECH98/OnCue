@@ -47,6 +47,36 @@ export function resolveNamedGuest(text: string, context: VoiceContext): string |
   return null;
 }
 
+/** "Q and A", "the video", "closing" — how segments actually get named aloud. */
+export function resolveSegment(text: string, context: VoiceContext): string | null {
+  const haystack = text.replace(/\bq\s*(?:and|&|n)\s*a\b/g, 'qa');
+
+  const lastWords = new Map<string, number>();
+  for (const segment of context.segments) {
+    const word = segment.title.toLowerCase().split(' ').at(-1);
+    if (word) lastWords.set(word, (lastWords.get(word) ?? 0) + 1);
+  }
+
+  const candidates: { id: string; name: string }[] = [];
+  for (const segment of context.segments) {
+    const title = segment.title.toLowerCase().replace(/&/g, 'and');
+    candidates.push({ id: segment.id, name: title });
+    candidates.push({ id: segment.id, name: segment.id.replace(/-/g, ' ') });
+    candidates.push({ id: segment.id, name: segment.id });
+
+    // A trailing word only identifies a segment when no other one shares it.
+    const word = segment.title.toLowerCase().split(' ').at(-1);
+    if (word && lastWords.get(word) === 1) candidates.push({ id: segment.id, name: word });
+  }
+
+  candidates.sort((a, b) => b.name.length - a.name.length);
+  for (const candidate of candidates) {
+    if (candidate.name.length < 2) continue;
+    if (new RegExp(`\\b${escape(candidate.name)}\\b`).test(haystack)) return candidate.id;
+  }
+  return null;
+}
+
 function cameraNumber(text: string): number | null {
   const explicit = text.match(/\b(?:camera|cam)\s*(\d{1,2}|\w+)\b/);
   if (explicit?.[1]) {
@@ -145,6 +175,22 @@ function interpretDirect(
 
   if (/\b(status|where are we|what.s (the )?status)\b/.test(text)) {
     return { toolCalls: [{ tool: 'get_show_status', args: {} }] };
+  }
+
+  if (/\b(go to break|take a break|we.re going to break|break now)\b/.test(text)) {
+    return { toolCalls: [{ tool: 'go_to_break', args: {} }] };
+  }
+
+  // Segment moves are checked before cameras and guests: "move to Q and A"
+  // is one instruction about the show, not about a camera.
+  const segment = resolveSegment(text, context);
+  if (segment) {
+    if (/\b(skip|drop|lose|cut)\b/.test(text)) {
+      return { toolCalls: [{ tool: 'skip_segment', args: { segment } }] };
+    }
+    if (/\b(move to|go to|take us to|jump to|straight to|on to|next up)\b/.test(text)) {
+      return { toolCalls: [{ tool: 'move_to_segment', args: { segment } }] };
+    }
   }
 
   if (/\bmusic\b/.test(text)) {

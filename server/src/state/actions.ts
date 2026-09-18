@@ -154,6 +154,87 @@ export function updateGuestMetadata(
 }
 
 /**
+ * Everything that changes when the show moves to a different segment.
+ *
+ * This is the point of OnCue: one instruction, a coordinated set of changes
+ * that a human would otherwise make across five different surfaces.
+ */
+export function moveToSegment(
+  state: BroadcastState,
+  segmentId: string,
+  nowMs: number,
+): string[] {
+  const segment = state.show.runOfShow.find((s) => s.id === segmentId);
+  if (!segment) return [];
+
+  const changes: string[] = [];
+  activateSegment(state, segment.id, nowMs);
+  changes.push(`${segment.title} live`);
+
+  const host = segment.guestId
+    ? state.speakers.guests.find((g) => g.id === segment.guestId)
+    : undefined;
+
+  if (host) {
+    // The segment is already live; takeGuest must not jump ahead to the next one.
+    changes.push(...takeGuest(state, host, nowMs, { advanceSegment: false }));
+
+    // When the host leads a segment, the guests need to be able to answer.
+    if (host.role === 'host') {
+      for (const guest of state.speakers.guests) {
+        if (guest.id === host.id) continue;
+        const mic = state.audio.microphones.find((m) => m.id === guest.microphoneId);
+        if (mic && mic.state !== 'live') {
+          setMicrophone(state, guest.microphoneId, 'ready');
+          changes.push(`Mic ${mic.id} ready`);
+        }
+      }
+    }
+  } else if (segment.mediaId) {
+    playMedia(state, segment.mediaId, nowMs);
+    changes.push(`${segment.title} rolling`);
+    hideLowerThird(state);
+    changes.push('Lower third out');
+  }
+
+  return changes;
+}
+
+/**
+ * Going to break: roll the bumper, close the guest microphones, bring the
+ * music up and get the next segment ready to come back to.
+ */
+export function goToBreak(state: BroadcastState, nowMs: number): string[] {
+  const changes: string[] = [];
+
+  if (playMedia(state, 'break-bumper', nowMs)) changes.push('Bumper rolling');
+
+  for (const mic of state.audio.microphones) {
+    if (mic.state !== 'muted') {
+      mic.state = 'muted';
+      mic.level = 0;
+      changes.push(`Mic ${mic.id} muted`);
+    }
+  }
+
+  setMusicLevel(state, 45);
+  changes.push('Music up');
+
+  if (state.graphics.current) {
+    hideLowerThird(state);
+    changes.push('Lower third out');
+  }
+
+  const next = nextPlayableSegment(state, state.show.currentSegmentId);
+  if (next) {
+    prepareSegment(state, next.id);
+    changes.push(`${next.title} ready`);
+  }
+
+  return changes;
+}
+
+/**
  * Undoes preparation that has not gone to air yet.
  *
  * Preview stays where it is: blanking the operator's monitor because they
@@ -232,7 +313,13 @@ export function moveSlide(state: BroadcastState, delta: number): number {
 }
 
 /** Everything that changes when a guest takes the program feed. */
-export function takeGuest(state: BroadcastState, guest: Guest, nowMs: number): string[] {
+export function takeGuest(
+  state: BroadcastState,
+  guest: Guest,
+  nowMs: number,
+  options: { advanceSegment?: boolean } = {},
+): string[] {
+  const { advanceSegment = true } = options;
   const changes: string[] = [];
   const previousGuestId = state.speakers.activeGuestId;
 
@@ -257,12 +344,14 @@ export function takeGuest(state: BroadcastState, guest: Guest, nowMs: number): s
   showLowerThird(state, lowerThirdFor(guest));
   changes.push('Lower third up');
 
-  const segment = state.show.runOfShow.find(
-    (s) => s.guestId === guest.id && (s.status === 'upcoming' || s.status === 'ready'),
-  );
-  if (segment) {
-    activateSegment(state, segment.id, nowMs);
-    changes.push(`${segment.title} live`);
+  if (advanceSegment) {
+    const segment = state.show.runOfShow.find(
+      (s) => s.guestId === guest.id && (s.status === 'upcoming' || s.status === 'ready'),
+    );
+    if (segment) {
+      activateSegment(state, segment.id, nowMs);
+      changes.push(`${segment.title} live`);
+    }
   }
 
   return changes;

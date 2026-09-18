@@ -10,9 +10,11 @@ import {
   clearPending,
   findGuest,
   findSegment,
+  goToBreak,
   hideLowerThird,
   lowerThirdFor,
   moveSlide,
+  moveToSegment,
   nextPlayableSegment,
   playMedia,
   prepareGuest,
@@ -376,6 +378,43 @@ const definitions = [
       if (!next) return fail('end_of_show', 'That was the last segment.');
       store.update((draft) => activateSegment(draft, next.id, nowMs));
       return ok(`${next.title} live.`, { changes: [`${next.title} live`] });
+    },
+  }),
+
+  define({
+    name: 'move_to_segment',
+    description:
+      'Move the whole show to a segment: run of show, camera, microphones and graphics together.',
+    risk: 'normal',
+    schema: toolSchemas.move_to_segment,
+    run: ({ store, nowMs }, { segment }) => {
+      const target = findSegment(store.getState(), segment);
+      if (!target) return fail('unknown_segment', UNKNOWN_SEGMENT);
+      if (target.status === 'live') return ok(`${target.title} is already live.`, { redundant: true });
+      if (target.status === 'completed') {
+        return fail('segment_finished', `${target.title} already played.`);
+      }
+
+      let changes: string[] = [];
+      store.update((draft) => {
+        changes = moveToSegment(draft, target.id, nowMs);
+      });
+      return ok(`${target.title} live.`, { changes });
+    },
+  }),
+
+  define({
+    name: 'go_to_break',
+    description:
+      'Go to break: roll the bumper, close the guest microphones, bring music up and ready the next segment.',
+    risk: 'normal',
+    schema: toolSchemas.go_to_break,
+    run: ({ store, nowMs }) => {
+      let changes: string[] = [];
+      store.update((draft) => {
+        changes = goToBreak(draft, nowMs);
+      });
+      return ok('Going to break.', { changes });
     },
   }),
 
