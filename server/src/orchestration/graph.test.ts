@@ -114,7 +114,7 @@ describe('orchestration graph', () => {
     assert.ok(result.path.includes('execute'));
   });
 
-  it('blocks audience-visible actions while the show is held', async () => {
+  it('stops queued cues from firing while the show is held', async () => {
     const store = new BroadcastStore();
     const orchestrate = createOrchestrator(store);
     store.update((draft) => {
@@ -122,13 +122,26 @@ describe('orchestration graph', () => {
     });
     const before = operationalSnapshot(store);
 
-    const blocked = await orchestrate('take_camera', { camera: 3 }, 'voice');
+    const blocked = await orchestrate('take_camera', { camera: 3 }, 'cue');
     assert.equal(blocked.ok, false);
     assert.equal(blocked.errorCode, 'on_hold');
     assert.equal(operationalSnapshot(store), before);
 
-    const allowed = await orchestrate('prepare_camera', { camera: 3 }, 'voice');
-    assert.equal(allowed.ok, true, 'preview work stays available during a hold');
+    const preview = await orchestrate('prepare_camera', { camera: 3 }, 'cue');
+    assert.equal(preview.ok, true, 'preview work stays available during a hold');
+  });
+
+  it('lets a direct instruction override a hold', async () => {
+    const store = new BroadcastStore();
+    const orchestrate = createOrchestrator(store);
+    store.update((draft) => {
+      draft.cueEngine.held = true;
+    });
+
+    const result = await orchestrate('take_camera', { camera: 3 }, 'voice');
+
+    assert.equal(result.ok, true, 'the operator speaking directly always wins');
+    assert.equal(store.getState().video.programCamera, 3);
   });
 
   it('stays fast enough for live production', async () => {

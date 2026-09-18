@@ -96,8 +96,9 @@ export function buildOrchestrationGraph(store: BroadcastStore) {
     }))
 
     .addNode('check_safety', (state) => {
-      // A hold freezes anything the audience would notice; preview work is fine.
-      if (state.reading?.held && state.risk !== 'low') {
+      // A hold freezes queued cues. A direct instruction from the operator is
+      // an intentional override, so it still goes through.
+      if (state.reading?.held && state.source === 'cue' && state.risk !== 'low') {
         return {
           path: ['check_safety'],
           outcome: {

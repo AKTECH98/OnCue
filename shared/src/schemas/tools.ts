@@ -76,6 +76,10 @@ export const toolSchemas = {
   skip_segment: z.object({ segment: segmentArg.optional() }),
   advance_run_of_show: z.object({}),
 
+  cancel_pending: z.object({}),
+  hold_show: z.object({}),
+  release_hold: z.object({}),
+
   get_show_status: z.object({}),
   reset_show: z.object({}),
 } as const;

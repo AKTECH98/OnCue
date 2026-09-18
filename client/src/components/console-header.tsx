@@ -11,6 +11,7 @@ export function ConsoleHeader() {
   const simulatedVoice = useConsoleStore((s) => s.simulatedVoice);
   const resetShow = useConsoleStore((s) => s.resetShow);
   const toggleDiagnostics = useConsoleStore((s) => s.toggleDiagnostics);
+  const held = useConsoleStore((s) => s.state?.cueEngine.held ?? false);
 
   const connected = connection === 'open';
   const late = (show?.delaySec ?? 0) > 15;
@@ -35,6 +36,12 @@ export function ConsoleHeader() {
       >
         {show?.onAir ? 'ON AIR' : 'OFF AIR'}
       </span>
+
+      {held ? (
+        <span className="rounded-sm border border-preview bg-preview/15 px-2 py-0.5 text-[10px] font-bold tracking-[0.2em] text-preview">
+          HOLD
+        </span>
+      ) : null}
 
       <div className="hidden min-w-0 flex-col leading-tight sm:flex">
         <span className="truncate text-[11px] text-console-300">{show?.eventTitle ?? '—'}</span>

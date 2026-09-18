@@ -7,7 +7,8 @@
 
 import type { BroadcastState, VoiceActivity } from './broadcast.js';
 
-export type ToolSource = 'manual' | 'voice' | 'test';
+/** Where a tool request came from. `cue` means it fired from the cue stack. */
+export type ToolSource = 'manual' | 'voice' | 'test' | 'cue';
 
 export interface ToolInvocationResult {
   ok: boolean;

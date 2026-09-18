@@ -1,5 +1,6 @@
 import type { VoiceContext } from '../backend.js';
 
+import { parseMetadata, splitCorrection, verbFrom } from './corrections.js';
 import { normalize, numberIn } from './normalize.js';
 
 export interface ToolCall {
@@ -84,13 +85,63 @@ function resolveThing(context: VoiceContext, memory: ConversationMemory): number
   return memory.lastCameraId ?? context.previewCamera;
 }
 
+/**
+ * Interprets one utterance, honouring any self-correction inside it.
+ *
+ * A corrected utterance is resolved from its tail; if the tail is only an
+ * object ("three"), it inherits the verb the operator used before correcting.
+ */
 export function interpret(
+  rawText: string,
+  context: VoiceContext,
+  memory: ConversationMemory,
+): Understanding | null {
+  const metadata = parseMetadata(rawText);
+  if (metadata) {
+    const guest =
+      resolveNamedGuest(normalize(rawText), context) ??
+      resolveNamedGuest(metadata.subject, context) ??
+      memory.lastGuestId;
+    if (!guest) return { toolCalls: [], say: 'Whose lower third?' };
+    return {
+      toolCalls: [
+        { tool: 'update_lower_third', args: { guest, [metadata.field]: metadata.value } },
+      ],
+    };
+  }
+
+  const correction = splitCorrection(rawText);
+  if (correction.corrected) {
+    // "Take two — actually three": the tail carries the new target but not the
+    // verb, so it inherits the one the operator used before correcting.
+    const headVerb = verbFrom(correction.head);
+    const effective =
+      verbFrom(correction.tail) || !headVerb
+        ? correction.tail
+        : `${headVerb} ${correction.tail}`;
+
+    const corrected = interpretDirect(effective, context, memory);
+    if (corrected) return corrected;
+  }
+
+  return interpretDirect(rawText, context, memory);
+}
+
+function interpretDirect(
   rawText: string,
   context: VoiceContext,
   memory: ConversationMemory,
 ): Understanding | null {
   const text = normalize(rawText);
   if (!text) return null;
+
+  if (/\b(cancel|drop|forget|never mind|scrub)\b/.test(text)) {
+    return { toolCalls: [{ tool: 'cancel_pending', args: {} }] };
+  }
+
+  if (/\b(go ahead|resume|carry on|release|we.re back|back on|continue)\b/.test(text)) {
+    return { toolCalls: [{ tool: 'release_hold', args: {} }] };
+  }
 
   if (/\b(status|where are we|what.s (the )?status)\b/.test(text)) {
     return { toolCalls: [{ tool: 'get_show_status', args: {} }] };

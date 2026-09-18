@@ -7,6 +7,7 @@ import {
 
 import {
   activateSegment,
+  clearPending,
   findGuest,
   findSegment,
   hideLowerThird,
@@ -375,6 +376,50 @@ const definitions = [
       if (!next) return fail('end_of_show', 'That was the last segment.');
       store.update((draft) => activateSegment(draft, next.id, nowMs));
       return ok(`${next.title} live.`, { changes: [`${next.title} live`] });
+    },
+  }),
+
+  define({
+    name: 'cancel_pending',
+    description:
+      'Drop whatever is queued but not yet on air: the prepared speaker, prepared graphics and any pending cue.',
+    risk: 'low',
+    schema: toolSchemas.cancel_pending,
+    run: ({ store }) => {
+      let changes: string[] = [];
+      store.update((draft) => {
+        changes = clearPending(draft);
+      });
+      if (changes.length === 0) return ok('Nothing pending.', { redundant: true });
+      return ok('Cancelled.', { changes });
+    },
+  }),
+
+  define({
+    name: 'hold_show',
+    description: 'Freeze pending cues. Nothing queued fires until the operator releases the hold.',
+    risk: 'low',
+    schema: toolSchemas.hold_show,
+    run: ({ store }) => {
+      if (store.getState().cueEngine.held) return ok('Already holding.', { redundant: true });
+      store.update((draft) => {
+        draft.cueEngine.held = true;
+      });
+      return ok('Holding.', { changes: ['Show held'] });
+    },
+  }),
+
+  define({
+    name: 'release_hold',
+    description: 'Release a hold so queued cues can fire again.',
+    risk: 'low',
+    schema: toolSchemas.release_hold,
+    run: ({ store }) => {
+      if (!store.getState().cueEngine.held) return ok('Not holding.', { redundant: true });
+      store.update((draft) => {
+        draft.cueEngine.held = false;
+      });
+      return ok('Back on.', { changes: ['Hold released'] });
     },
   }),
 

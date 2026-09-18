@@ -57,13 +57,6 @@ export class VoiceSession {
     }
   }
 
-  /** Release a hold so audience-visible actions can run again. */
-  release(): void {
-    this.options.store.update((draft) => {
-      draft.cueEngine.held = false;
-    });
-  }
-
   transcribe(text: string, final: boolean): void {
     this.options.send({
       type: 'transcript',
@@ -96,8 +89,6 @@ export class VoiceSession {
       this.options.store.update((draft) => {
         draft.cueEngine.held = true;
       });
-    } else if (turn.toolCalls.length > 0) {
-      this.release();
     }
 
     let spokenResult: string | null = null;

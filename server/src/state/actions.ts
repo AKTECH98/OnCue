@@ -153,6 +153,55 @@ export function updateGuestMetadata(
   return guest;
 }
 
+/**
+ * Undoes preparation that has not gone to air yet.
+ *
+ * Preview stays where it is: blanking the operator's monitor because they
+ * cancelled a cue would be its own kind of surprise.
+ */
+export function clearPending(state: BroadcastState): string[] {
+  const changes: string[] = [];
+  const preparedId = state.speakers.preparedGuestId;
+
+  if (preparedId) {
+    const guest = state.speakers.guests.find((g) => g.id === preparedId);
+    state.speakers.preparedGuestId = null;
+    changes.push(`${guest?.name ?? 'Speaker'} no longer prepared`);
+
+    if (guest) {
+      const mic = state.audio.microphones.find((m) => m.id === guest.microphoneId);
+      if (mic?.state === 'ready') {
+        mic.state = 'muted';
+        mic.level = 0;
+        changes.push(`Mic ${mic.id} muted`);
+      }
+    }
+  }
+
+  if (state.graphics.prepared) {
+    state.graphics.prepared = null;
+    changes.push('Prepared lower third cleared');
+  }
+
+  for (const segment of state.show.runOfShow) {
+    if (segment.status === 'ready') {
+      segment.status = 'upcoming';
+      changes.push(`${segment.title} back to upcoming`);
+    }
+  }
+
+  for (const cue of state.cueEngine.cues) {
+    if (cue.state === 'ready' || cue.state === 'waiting') {
+      cue.state = 'cancelled';
+      cue.updatedAtMs = Date.now();
+      cue.note = 'Cancelled by the operator';
+      changes.push(`Cue cancelled: ${cue.description}`);
+    }
+  }
+
+  return changes;
+}
+
 export function playMedia(state: BroadcastState, mediaId: string, nowMs: number): boolean {
   const item = state.media.library.find((m) => m.id === mediaId);
   if (!item) return false;
