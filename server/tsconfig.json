@@ -1,0 +1,15 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": "..",
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "paths": {
+      "@oncue/shared": ["./shared/src/index.ts"],
+      "@oncue/shared/*": ["./shared/src/*"]
+    }
+  },
+  "include": ["src"]
+}
