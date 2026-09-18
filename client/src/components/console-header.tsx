@@ -1,4 +1,4 @@
-import { MicOff, RotateCcw, Wifi, WifiOff } from 'lucide-react';
+import { Activity, MicOff, RotateCcw, Wifi, WifiOff } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
@@ -10,6 +10,7 @@ export function ConsoleHeader() {
   const connection = useConsoleStore((s) => s.connection);
   const simulatedVoice = useConsoleStore((s) => s.simulatedVoice);
   const resetShow = useConsoleStore((s) => s.resetShow);
+  const toggleDiagnostics = useConsoleStore((s) => s.toggleDiagnostics);
 
   const connected = connection === 'open';
   const late = (show?.delaySec ?? 0) > 15;
@@ -62,6 +63,16 @@ export function ConsoleHeader() {
             tone="idle"
           />
         </div>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={toggleDiagnostics}
+          aria-label="Toggle orchestration diagnostics"
+          title="Orchestration diagnostics"
+        >
+          <Activity className="h-4 w-4" />
+        </Button>
 
         <Button variant="outline" size="md" onClick={resetShow} title="Restore the rehearsal state">
           <RotateCcw className="h-3.5 w-3.5" />

@@ -2,8 +2,8 @@ import { createServer } from 'node:http';
 
 import { env } from './config/env.js';
 import { createRouter } from './http/routes.js';
+import { createOrchestrator } from './orchestration/orchestrator.js';
 import { BroadcastStore } from './state/store.js';
-import { createToolExecutor } from './tools/execute.js';
 import { tracer, type TracingHealth } from './tracing/tracer.js';
 import { createRealtimeServer } from './websocket/realtime-server.js';
 
@@ -12,7 +12,7 @@ store.startClock();
 
 let tracingHealth: TracingHealth | null = null;
 
-const executeTool = createToolExecutor(store);
+const executeTool = createOrchestrator(store);
 
 const router = createRouter({ store, tracingHealth: () => tracingHealth, executeTool });
 const httpServer = createServer((req, res) => {

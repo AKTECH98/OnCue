@@ -124,7 +124,7 @@ before the next begins.
 - [x] **Phase 0** — Project foundation: workspaces, shared domain types, WebSocket link, tracing config
 - [x] **Phase 1** — Broadcast simulator (fully operable by hand, no AI)
 - [x] **Phase 2** — Deterministic broadcast domain tools
-- [ ] **Phase 3** — LangGraph orchestration layer
+- [x] **Phase 3** — LangGraph orchestration layer
 - [ ] **Phase 4** — Higgs Realtime foundation
 - [ ] **Phase 5** — Higgs tool calling
 - [ ] **Phase 6** — Contextual production language
@@ -163,3 +163,33 @@ curl -X POST http://127.0.0.1:43128/api/tools/prepare_guest \
 curl -X POST http://127.0.0.1:43128/api/tools/take_guest \
   -H 'content-type: application/json' -d '{"guest":"daniel"}'
 ```
+
+---
+
+## Orchestration
+
+Every operational request — spoken, clicked or scripted — walks the same
+LangGraph workflow, so all three paths produce identical state by construction.
+
+```text
+validate_input → read_state → check_safety → resolve_operation → execute → return_result
+                                   │              
+                                   └── request_confirmation (high-risk, spoken only)
+```
+
+- **validate_input** rejects unknown tools and bad arguments before the domain
+  layer sees them, so a failed call cannot mutate production state
+- **check_safety** blocks audience-visible actions while the show is held, and
+  sends high-risk spoken requests to confirmation
+- **execute** runs the deterministic tool; redundant requests are reported
+  ("Camera one is already live.") rather than re-cut
+
+The node path is returned with every result and recorded on every trace:
+
+```bash
+curl -s http://127.0.0.1:43128/api/traces | head -30
+```
+
+To send traces to LangSmith instead of the local buffer, set `LANGSMITH_TRACING=true`
+and `LANGSMITH_API_KEY` in `.env`. Open the diagnostics drawer in the console
+(the pulse icon in the header) to watch node paths and latency live.

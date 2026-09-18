@@ -11,6 +11,8 @@
     "test": "tsx --test \"src/**/*.test.ts\""
   },
   "dependencies": {
+    "@langchain/core": "^0.3.80",
+    "@langchain/langgraph": "^0.2.74",
     "@oncue/shared": "*",
     "dotenv": "^16.4.7",
     "langsmith": "^0.3.87",
