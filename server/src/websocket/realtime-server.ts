@@ -13,6 +13,7 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { env } from '../config/env.js';
 import type { BroadcastStore } from '../state/store.js';
 import { tracer } from '../tracing/tracer.js';
+import { VoiceSession } from '../voice/session.js';
 
 export type ToolExecutor = (
   tool: string,
@@ -60,8 +61,18 @@ export function createRealtimeServer({
     broadcast({ type: 'trace', entry });
   });
 
+  const sessions = new Map<WebSocket, VoiceSession>();
+
   wss.on('connection', (socket) => {
     clients.add(socket);
+    sessions.set(
+      socket,
+      new VoiceSession({
+        store,
+        orchestrate: executeTool,
+        send: (message) => send(socket, message),
+      }),
+    );
 
     send(socket, {
       type: 'server:hello',
@@ -82,8 +93,13 @@ export function createRealtimeServer({
       void handleMessage(socket, message);
     });
 
-    socket.on('close', () => clients.delete(socket));
-    socket.on('error', () => clients.delete(socket));
+    const teardown = () => {
+      clients.delete(socket);
+      void sessions.get(socket)?.close();
+      sessions.delete(socket);
+    };
+    socket.on('close', teardown);
+    socket.on('error', teardown);
   });
 
   async function handleMessage(socket: WebSocket, message: ClientMessage): Promise<void> {
@@ -111,6 +127,25 @@ export function createRealtimeServer({
       case 'tool:invoke': {
         const result = await executeTool(message.tool, message.args ?? {}, message.source);
         send(socket, { type: 'tool:result', requestId: message.requestId, result });
+        return;
+      }
+
+      case 'voice:listening':
+        sessions.get(socket)?.setListening(message.listening);
+        return;
+
+      case 'voice:interrupt':
+        sessions.get(socket)?.interrupt(message.reason);
+        return;
+
+      case 'voice:utterance': {
+        const session = sessions.get(socket);
+        if (!session) return;
+        if (!message.final) {
+          session.transcribe(message.text, false);
+          return;
+        }
+        await session.handleUtterance(message.text);
         return;
       }
 

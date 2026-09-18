@@ -52,7 +52,12 @@ export type ClientMessage =
       tool: string;
       args: Record<string, unknown>;
       source: ToolSource;
-    };
+    }
+  /** A recognised operator utterance. Partials arrive with `final: false`. */
+  | { type: 'voice:utterance'; text: string; final: boolean }
+  /** The operator started talking over OnCue, or said "hold". */
+  | { type: 'voice:interrupt'; reason: 'barge_in' | 'hold' }
+  | { type: 'voice:listening'; listening: boolean };
 
 export type ServerMessage =
   | { type: 'server:hello'; serverTimeMs: number; simulatedVoice: boolean; protocolVersion: number }
@@ -61,6 +66,10 @@ export type ServerMessage =
   | { type: 'trace'; entry: TraceEntry }
   | { type: 'transcript'; entry: TranscriptEntry }
   | { type: 'voice:activity'; activity: VoiceActivity }
+  /** What OnCue should say. Short by design — one clause, not a paragraph. */
+  | { type: 'voice:say'; id: string; text: string }
+  /** Stop speaking immediately; the operator has the floor. */
+  | { type: 'voice:stop' }
   | { type: 'error'; code: string; message: string };
 
 export const PROTOCOL_VERSION = 1;

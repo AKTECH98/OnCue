@@ -8,7 +8,10 @@ import type {
 } from '@oncue/shared';
 import { create } from 'zustand';
 
+import type { VoiceActivity } from '@oncue/shared';
+
 import { defaultServerUrl, RealtimeConnection, type ConnectionStatus } from '@/realtime/connection';
+import { VoiceController } from '@/realtime/voice-controller';
 
 const MAX_TRACES = 40;
 const MAX_TRANSCRIPT = 12;
@@ -22,8 +25,16 @@ interface ConsoleStore {
   lastResult: ToolInvocationResult | null;
   diagnosticsOpen: boolean;
 
+  voiceSupported: boolean;
+  voiceListening: boolean;
+  voiceActivity: VoiceActivity;
+  voiceError: string | null;
+
   connect: () => void;
   disconnect: () => void;
+  startListening: () => void;
+  stopListening: () => void;
+  sendUtterance: (text: string) => void;
   invoke: (
     tool: string,
     args?: Record<string, unknown>,
@@ -34,6 +45,28 @@ interface ConsoleStore {
 }
 
 let connection: RealtimeConnection | null = null;
+let voice: VoiceController | null = null;
+
+/** Built lazily so the browser never asks for a microphone until asked to. */
+function ensureVoice(set: (partial: Partial<ConsoleStore>) => void): VoiceController {
+  voice ??= new VoiceController({
+    onUtterance: (text, final) => {
+      connection?.send({ type: 'voice:utterance', text, final });
+    },
+    onInterrupt: (reason) => {
+      connection?.send({ type: 'voice:interrupt', reason });
+    },
+    onListeningChange: (listening) => {
+      set({ voiceListening: listening, voiceActivity: listening ? 'listening' : 'idle' });
+      connection?.send({ type: 'voice:listening', listening });
+    },
+    onSpeakingChange: (speaking) => {
+      set({ voiceActivity: speaking ? 'speaking' : 'listening' });
+    },
+    onError: (message) => set({ voiceError: message }),
+  });
+  return voice;
+}
 
 export const useConsoleStore = create<ConsoleStore>((set, get) => ({
   connection: 'closed',
@@ -43,6 +76,11 @@ export const useConsoleStore = create<ConsoleStore>((set, get) => ({
   transcript: [],
   lastResult: null,
   diagnosticsOpen: false,
+
+  voiceSupported: VoiceController.supported,
+  voiceListening: false,
+  voiceActivity: 'idle',
+  voiceError: null,
 
   connect: () => {
     if (connection) return;
@@ -71,6 +109,15 @@ export const useConsoleStore = create<ConsoleStore>((set, get) => ({
               transcript: [message.entry, ...current.transcript].slice(0, MAX_TRANSCRIPT),
             }));
             break;
+          case 'voice:activity':
+            set({ voiceActivity: message.activity });
+            break;
+          case 'voice:say':
+            voice?.speak(message.text);
+            break;
+          case 'voice:stop':
+            voice?.cancelSpeech();
+            break;
           default:
             break;
         }
@@ -80,9 +127,29 @@ export const useConsoleStore = create<ConsoleStore>((set, get) => ({
   },
 
   disconnect: () => {
+    voice?.dispose();
+    voice = null;
     connection?.disconnect();
     connection = null;
-    set({ connection: 'closed' });
+    set({ connection: 'closed', voiceListening: false, voiceActivity: 'idle' });
+  },
+
+  startListening: () => {
+    set({ voiceError: null });
+    ensureVoice(set).start();
+  },
+
+  stopListening: () => {
+    voice?.stop();
+    voice?.cancelSpeech();
+  },
+
+  /** Typed commands take exactly the same path as spoken ones. */
+  sendUtterance: (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    ensureVoice(set);
+    connection?.send({ type: 'voice:utterance', text: trimmed, final: true });
   },
 
   invoke: async (tool, args = {}, source: ToolSource = 'manual') => {

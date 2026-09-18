@@ -10,6 +10,7 @@ import { GuestControls } from '@/components/guest-controls';
 import { MediaPanel } from '@/components/media-panel';
 import { ProgramMonitor, PreviewMonitor } from '@/components/monitors';
 import { RunOfShow } from '@/components/run-of-show';
+import { VoiceBar } from '@/components/voice-bar';
 import { useConsoleStore } from '@/store/console-store';
 
 export default function App() {
@@ -47,6 +48,7 @@ export default function App() {
         </div>
       </div>
 
+      <VoiceBar />
       <ActivityBar />
       <Diagnostics />
     </div>

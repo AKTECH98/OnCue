@@ -125,7 +125,7 @@ before the next begins.
 - [x] **Phase 1** — Broadcast simulator (fully operable by hand, no AI)
 - [x] **Phase 2** — Deterministic broadcast domain tools
 - [x] **Phase 3** — LangGraph orchestration layer
-- [ ] **Phase 4** — Higgs Realtime foundation
+- [x] **Phase 4** — Realtime voice foundation (browser speech path; Higgs transport pending credentials)
 - [ ] **Phase 5** — Higgs tool calling
 - [ ] **Phase 6** — Contextual production language
 - [ ] **Phase 7** — Corrections and hold behavior
@@ -193,3 +193,34 @@ curl -s http://127.0.0.1:43128/api/traces | head -30
 To send traces to LangSmith instead of the local buffer, set `LANGSMITH_TRACING=true`
 and `LANGSMITH_API_KEY` in `.env`. Open the diagnostics drawer in the console
 (the pulse icon in the header) to watch node paths and latency live.
+
+---
+
+## Voice
+
+OnCue's voice layer is split so the understanding engine can be swapped without
+touching the console or the orchestration graph:
+
+```text
+browser mic  →  utterance  →  VoiceSession  →  VoiceBackend (understanding)
+                                   │                  │
+                            transcript, activity   tool calls
+                                                      ↓
+                                              LangGraph orchestration
+```
+
+**Without a Higgs key** OnCue uses the browser's Web Speech API for capture and
+playback, and a deterministic understander on the server. You get a real,
+interruptible voice loop — press **Listen**, say *"hello OnCue"*, and talk over
+it to cut it off. Every spoken command can also be typed into the command box,
+and takes exactly the same path.
+
+**With a Higgs key** the same `VoiceBackend` interface is implemented by the
+Higgs Realtime adapter; nothing else in the system changes.
+
+Interruption is treated as a first-class behaviour, not an edge case:
+
+- speaking over OnCue cancels its speech immediately and it keeps listening
+- saying *"hold"* stops speech **and** freezes anything the audience would see,
+  while still allowing preview work
+- a turn that was interrupted can never speak afterwards
