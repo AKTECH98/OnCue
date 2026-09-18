@@ -100,13 +100,22 @@ export class VoiceSession {
       this.release();
     }
 
+    let spokenResult: string | null = null;
     for (const call of turn.toolCalls) {
       const result = await this.options.orchestrate(call.tool, call.args, 'voice');
       this.backend.observeToolResult?.(call.tool, result.ok, result.message);
       if (turnId !== this.turnId) return;
+
+      // A failure is the thing worth saying; otherwise report the last action.
+      if (!result.ok) {
+        spokenResult = result.message;
+        break;
+      }
+      spokenResult = result.message;
     }
 
-    if (turn.say) this.say(turn.say);
+    const reply = turn.say ?? spokenResult;
+    if (reply) this.say(reply);
     else this.setActivity('listening');
   }
 

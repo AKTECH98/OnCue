@@ -126,7 +126,7 @@ before the next begins.
 - [x] **Phase 2** — Deterministic broadcast domain tools
 - [x] **Phase 3** — LangGraph orchestration layer
 - [x] **Phase 4** — Realtime voice foundation (browser speech path; Higgs transport pending credentials)
-- [ ] **Phase 5** — Higgs tool calling
+- [x] **Phase 5** — Voice tool calling
 - [ ] **Phase 6** — Contextual production language
 - [ ] **Phase 7** — Corrections and hold behavior
 - [ ] **Phase 8** — Cue stack
